@@ -1,118 +1,51 @@
 {
   "input": {
-    "images": [
-      {
-        "name": "test.png",
-        "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAMklEQVR4nGI5ZdXAQEvARFPTRy0YtWDUglELRi0YtWDUglELRi0YtWDUAioCQAAAAP//E24Bx3jUKuYAAAAASUVORK5CYII="
-      }
-    ],
     "workflow": {
-      "6": {
-        "inputs": {
-          "text": "anime cat with massive fluffy fennec ears and a big fluffy tail blonde messy long hair blue eyes wearing a construction outfit placing a fancy black forest cake with candles on top of a dinner table of an old dark Victorian mansion lit by candlelight with a bright window to the foggy forest and very expensive stuff everywhere there are paintings on the walls",
-          "clip": ["30", 1]
-        },
-        "class_type": "CLIPTextEncode",
-        "_meta": {
-          "title": "CLIP Text Encode (Positive Prompt)"
-        }
-      },
-      "8": {
-        "inputs": {
-          "samples": ["31", 0],
-          "vae": ["30", 2]
-        },
-        "class_type": "VAEDecode",
-        "_meta": {
-          "title": "VAE Decode"
-        }
-      },
-      "9": {
-        "inputs": {
-          "filename_prefix": "ComfyUI",
-          "images": ["8", 0]
-        },
-        "class_type": "SaveImage",
-        "_meta": {
-          "title": "Save Image"
-        }
-      },
-      "27": {
-        "inputs": {
-          "width": 512,
-          "height": 512,
-          "batch_size": 1
-        },
-        "class_type": "EmptySD3LatentImage",
-        "_meta": {
-          "title": "EmptySD3LatentImage"
-        }
-      },
-      "30": {
-        "inputs": {
-          "ckpt_name": "flux1-dev-fp8.safetensors"
-        },
+      "1": {
+        "inputs": { "ckpt_name": "CyberRealisticPony_V18.0_F16.safetensors" },
         "class_type": "CheckpointLoaderSimple",
-        "_meta": {
-          "title": "Load Checkpoint"
-        }
+        "_meta": { "title": "Load Checkpoint" }
       },
-      "31": {
+      "2": {
+        "inputs": { "text": "a beautiful horse in a meadow, photorealistic", "clip": ["1", 1] },
+        "class_type": "CLIPTextEncode",
+        "_meta": { "title": "Positive" }
+      },
+      "3": {
+        "inputs": { "text": "worst quality, blurry", "clip": ["1", 1] },
+        "class_type": "CLIPTextEncode",
+        "_meta": { "title": "Negative" }
+      },
+      "4": {
+        "inputs": { "width": 512, "height": 512, "batch_size": 1 },
+        "class_type": "EmptyLatentImage",
+        "_meta": { "title": "Latent" }
+      },
+      "5": {
         "inputs": {
-          "seed": 243057879077961,
-          "steps": 10,
-          "cfg": 1,
-          "sampler_name": "euler",
-          "scheduler": "simple",
+          "seed": 42,
+          "steps": 20,
+          "cfg": 7,
+          "sampler_name": "euler_ancestral",
+          "scheduler": "karras",
           "denoise": 1,
-          "model": ["30", 0],
-          "positive": ["35", 0],
-          "negative": ["33", 0],
-          "latent_image": ["27", 0]
+          "model": ["1", 0],
+          "positive": ["2", 0],
+          "negative": ["3", 0],
+          "latent_image": ["4", 0]
         },
         "class_type": "KSampler",
-        "_meta": {
-          "title": "KSampler"
-        }
+        "_meta": { "title": "KSampler" }
       },
-      "33": {
-        "inputs": {
-          "text": "",
-          "clip": ["30", 1]
-        },
-        "class_type": "CLIPTextEncode",
-        "_meta": {
-          "title": "CLIP Text Encode (Negative Prompt)"
-        }
+      "6": {
+        "inputs": { "samples": ["5", 0], "vae": ["1", 2] },
+        "class_type": "VAEDecode",
+        "_meta": { "title": "VAE Decode" }
       },
-      "35": {
-        "inputs": {
-          "guidance": 3.5,
-          "conditioning": ["6", 0]
-        },
-        "class_type": "FluxGuidance",
-        "_meta": {
-          "title": "FluxGuidance"
-        }
-      },
-      "38": {
-        "inputs": {
-          "images": ["8", 0]
-        },
-        "class_type": "PreviewImage",
-        "_meta": {
-          "title": "Preview Image"
-        }
-      },
-      "40": {
-        "inputs": {
-          "filename_prefix": "ComfyUI",
-          "images": ["8", 0]
-        },
+      "7": {
+        "inputs": { "filename_prefix": "test", "images": ["6", 0] },
         "class_type": "SaveImage",
-        "_meta": {
-          "title": "Save Image"
-        }
+        "_meta": { "title": "Save Image" }
       }
     }
   }
