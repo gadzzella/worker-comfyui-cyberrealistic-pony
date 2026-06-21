@@ -39,6 +39,8 @@ jobs:
           push: true
           tags: gadzela/cyberrealistic-pony:latest
           build-args: |
-            HF_TOKEN=${{ secrets.HF_TOKEN }}
+            HUGGINGFACE_ACCESS_TOKEN=${{ secrets.HF_TOKEN }}
             CIVITAI_TOKEN=${{ secrets.CIVITAI_TOKEN }}
+            MODEL_TYPE=none
           no-cache: true
+          network: host
