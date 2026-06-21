@@ -125,6 +125,9 @@ ARG HUGGINGFACE_ACCESS_TOKEN
 # Set default model type if none is provided
 ARG MODEL_TYPE=flux1-dev-fp8
 
+# Install curl (not present in nvidia/cuda base image)
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # Change working directory to ComfyUI
 WORKDIR /comfyui
 
