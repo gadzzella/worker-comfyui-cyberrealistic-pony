@@ -170,15 +170,17 @@ RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
 # CyberRealisticPony checkpoint + LoRAs
 ARG CIVITAI_TOKEN
 RUN mkdir -p models/loras && \
-    wget --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      -O models/checkpoints/CyberRealisticPony_V18.0_F16.safetensors \
+    curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
+      --location-trusted \
+      -o models/checkpoints/CyberRealisticPony_V18.0_F16.safetensors \
       "https://huggingface.co/cyberdelia/CyberRealisticPony/resolve/main/CyberRealisticPony_V18.0_F16.safetensors" && \
-    wget --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      -O models/loras/PonyRealismSlider.safetensors \
+    curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
+      --location-trusted \
+      -o models/loras/PonyRealismSlider.safetensors \
       "https://huggingface.co/Patil/ponyxl-v6/resolve/main/Pony%20Realism%20Slider.safetensors" && \
-    wget -L \
-      --header="User-Agent: Mozilla/5.0" \
-      -O models/loras/PonyRealismEnhancer.safetensors \
+    curl -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/PonyRealismEnhancer.safetensors \
       "https://civitai.com/api/download/models/1439429?token=${CIVITAI_TOKEN}"
 
 # Stage 3: Final image
