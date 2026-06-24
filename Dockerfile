@@ -184,7 +184,15 @@ RUN mkdir -p models/loras && \
     curl -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/PonyRealismEnhancer.safetensors \
-      "https://civitai.com/api/download/models/1439429?token=${CIVITAI_TOKEN}"
+      "https://civitai.com/api/download/models/1439429?token=${CIVITAI_TOKEN}" && \
+    curl -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/RealBeautyV1.safetensors \
+      "https://civitai.com/api/download/models/596040?token=${CIVITAI_TOKEN}" && \
+    curl -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/ExpressiveH.safetensors \
+      "https://civitai.com/api/download/models/382152?token=${CIVITAI_TOKEN}"
 
 # Stage 3: Final image
 FROM base AS final
