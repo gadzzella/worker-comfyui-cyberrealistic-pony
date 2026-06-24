@@ -42,5 +42,9 @@ jobs:
             HUGGINGFACE_ACCESS_TOKEN=${{ secrets.HF_TOKEN }}
             CIVITAI_TOKEN=${{ secrets.CIVITAI_TOKEN }}
             MODEL_TYPE=none
+            BASE_IMAGE=nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+            CUDA_VERSION_FOR_COMFY=11.8
+            ENABLE_PYTORCH_UPGRADE=true
+            PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu118
           no-cache: true
           network: host
