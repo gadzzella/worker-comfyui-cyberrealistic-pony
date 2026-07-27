@@ -194,6 +194,12 @@ RUN mkdir -p models/loras && \
       -o models/loras/ExpressiveH.safetensors \
       "https://civitai.com/api/download/models/382152?token=${CIVITAI_TOKEN}"
 
+# PrefectPonyXL checkpoint (anime)
+RUN curl -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/checkpoints/PrefectPonyXL_v6.safetensors \
+      "https://civitai.com/api/download/models/2114187?fileId=2008663&token=${CIVITAI_TOKEN}"
+
 # Stage 3: Final image
 FROM base AS final
 
