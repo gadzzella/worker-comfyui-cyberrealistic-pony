@@ -170,36 +170,29 @@ RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
       wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/model_patches/Z-Image-Turbo-Fun-Controlnet-Union.safetensors https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union.safetensors; \
     fi
 
-# CyberRealisticPony checkpoint + LoRAs
+# CyberRealisticPony checkpoint + LoRA
 ARG CIVITAI_TOKEN
 RUN mkdir -p models/loras && \
     curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
       --location-trusted \
       -o models/checkpoints/CyberRealisticPony_V18.0_F16.safetensors \
       "https://huggingface.co/cyberdelia/CyberRealisticPony/resolve/main/CyberRealisticPony_V18.0_F16.safetensors" && \
-    curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      --location-trusted \
-      -o models/loras/PonyRealismSlider.safetensors \
-      "https://huggingface.co/Patil/ponyxl-v6/resolve/main/Pony%20Realism%20Slider.safetensors" && \
-    curl -L \
-      --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/PonyRealismEnhancer.safetensors \
-      "https://civitai.com/api/download/models/1439429?token=${CIVITAI_TOKEN}" && \
-    curl -L \
-      --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/RealBeautyV1.safetensors \
-      "https://civitai.com/api/download/models/596040?token=${CIVITAI_TOKEN}" && \
     curl -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/ExpressiveH.safetensors \
       "https://civitai.com/api/download/models/382152?token=${CIVITAI_TOKEN}"
 
-# AlbedoBase XL v3.1 Large checkpoint
+# Juggernaut XL - Ragnarok (XIII) checkpoint
 RUN curl -L \
-      --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      --location-trusted \
-      -o models/checkpoints/albedobaseXL_v31Large.safetensors \
-      "https://huggingface.co/AiWise/AlbedoBase-XL_v31-Large/resolve/main/albedobaseXL_v31Large.safetensors"
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/checkpoints/JuggernautXL_Ragnarok.safetensors \
+      "https://civitai.com/api/download/models/1759168?token=${CIVITAI_TOKEN}"
+
+# LoRA - femboysXL (rename filename below to the LoRA's actual name if you have it)
+RUN curl -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/femboysXL.safetensors \
+      "https://civitai.com/api/download/models/324974?token=${CIVITAI_TOKEN}"
 
 # Stage 3: Final image
 FROM base AS final
