@@ -182,16 +182,16 @@ RUN mkdir -p models/loras && \
       -o models/loras/ExpressiveH.safetensors \
       "https://civitai.com/api/download/models/382152?token=${CIVITAI_TOKEN}"
 
-# Juggernaut XL - Ragnarok (XIII) checkpoint
+# Animagine XL 4.0 (finetuned) checkpoint
 RUN curl -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/checkpoints/JuggernautXL_Ragnarok.safetensors \
-      "https://civitai.com/api/download/models/1759168?token=${CIVITAI_TOKEN}"
+      -o models/checkpoints/AnimagineXL_v40_Finetuned.safetensors \
+      "https://civitai.com/api/download/models/2113085?token=${CIVITAI_TOKEN}"
 
-# LoRA - femboysXL (rename filename below to the LoRA's actual name if you have it)
+# LoRA - civitai:289006@324974 (rename filename below to the LoRA's actual name if you have it)
 RUN curl -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/femboysXL.safetensors \
+      -o models/loras/FemboysXL.safetensors \
       "https://civitai.com/api/download/models/324974?token=${CIVITAI_TOKEN}"
 
 # Stage 3: Final image
