@@ -182,16 +182,16 @@ RUN mkdir -p models/loras && \
       -o models/loras/ExpressiveH.safetensors \
       "https://civitai.com/api/download/models/382152?token=${CIVITAI_TOKEN}"
 
-# Animagine XL 4.0 (finetuned) checkpoint
+# Pony Diffusion V6 XL checkpoint
 RUN curl -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/checkpoints/AnimagineXL_v40_Finetuned.safetensors \
-      "https://civitai.com/api/download/models/2113085?token=${CIVITAI_TOKEN}"
+      -o models/checkpoints/PonyDiffusionV6XL.safetensors \
+      "https://civitai.com/api/download/models/290640?fileId=228616&token=${CIVITAI_TOKEN}"
 
 # LoRA - civitai:289006@324974 (rename filename below to the LoRA's actual name if you have it)
 RUN curl -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/FemboysXL.safetensors \
+      -o models/loras/civitai_289006.safetensors \
       "https://civitai.com/api/download/models/324974?token=${CIVITAI_TOKEN}"
 
 # Stage 3: Final image
