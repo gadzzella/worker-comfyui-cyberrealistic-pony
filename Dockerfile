@@ -177,21 +177,21 @@ RUN mkdir -p models/loras && \
       --location-trusted \
       -o models/checkpoints/CyberRealisticPony_V18.0_F16.safetensors \
       "https://huggingface.co/cyberdelia/CyberRealisticPony/resolve/main/CyberRealisticPony_V18.0_F16.safetensors" && \
-    curl -L \
-      --header "User-Agent: Mozilla/5.0" \
+    curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
+      --location-trusted \
       -o models/loras/ExpressiveH.safetensors \
-      "https://civitai.com/api/download/models/382152?token=${CIVITAI_TOKEN}"
+      "https://huggingface.co/SeyrolART/ExpressiveH/resolve/main/Expressive_H-000001.safetensors"
 
 # Pony Diffusion V6 XL checkpoint
-RUN curl -L \
-      --header "User-Agent: Mozilla/5.0" \
+RUN curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
+      --location-trusted \
       -o models/checkpoints/PonyDiffusionV6XL.safetensors \
-      "https://civitai.com/api/download/models/290640?fileId=228616&token=${CIVITAI_TOKEN}"
+      "https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL/resolve/main/ponyDiffusionV6XL_v6StartWithThisOne.safetensors"
 
-# LoRA - civitai:289006@324974 (rename filename below to the LoRA's actual name if you have it)
+# FemboysXL LoRA - civitai:289006@324974 (kept on Civitai, no verified HF mirror found)
 RUN curl -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/civitai_289006.safetensors \
+      -o models/loras/FemboysXL.safetensors \
       "https://civitai.com/api/download/models/324974?token=${CIVITAI_TOKEN}"
 
 # Stage 3: Final image
