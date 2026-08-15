@@ -62,6 +62,15 @@ RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
       uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
     fi
 
+# Install custom nodes needed for FaceDetailer (Impact Pack + Subpack for
+# UltralyticsDetectorProvider). Installed here, BEFORE the requirements loop
+# and smoke test below, so their dependencies get picked up by that loop and
+# land in /opt/venv (the launch venv) instead of comfy-cli's own /comfyui/.venv,
+# and so a broken import is caught by the smoke test at build time.
+COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
+RUN chmod +x /usr/local/bin/comfy-node-install
+RUN comfy-node-install comfyui-impact-pack comfyui-impact-subpack
+
 # comfy-cli installs ComfyUI into its own workspace venv (/comfyui/.venv), but
 # start.sh launches ComfyUI with /opt/venv's python. That mismatch leaves the
 # launch venv missing ComfyUI's runtime deps (e.g. sqlalchemy, pulled in by
@@ -104,10 +113,6 @@ RUN uv pip install runpod requests websocket-client
 ADD src/start.sh src/network_volume.py handler.py test_input.json ./
 RUN chmod +x /start.sh
 
-# Add script to install custom nodes
-COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
-RUN chmod +x /usr/local/bin/comfy-node-install
-
 # Prevent pip from asking for confirmation during uninstall steps in custom nodes
 ENV PIP_NO_INPUT=1
 
@@ -132,7 +137,7 @@ RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /comfyui
 
 # Create necessary directories upfront
-RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/model_patches
+RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/model_patches models/upscale_models models/ultralytics/bbox
 
 # Download checkpoints/vae/unet/clip models to include in image based on model type
 RUN if [ "$MODEL_TYPE" = "sdxl" ]; then \
@@ -182,17 +187,35 @@ RUN mkdir -p models/loras && \
       -o models/loras/ExpressiveH.safetensors \
       "https://huggingface.co/SeyrolART/ExpressiveH/resolve/main/Expressive_H-000001.safetensors"
 
-# Pony Diffusion V6 XL checkpoint
+# Pony Diffusion V6 XL checkpoint (verified HF mirror, SHA256 matches official Civitai hash 67ab2fd8ec...)
 RUN curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
       --location-trusted \
       -o models/checkpoints/PonyDiffusionV6XL.safetensors \
       "https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL/resolve/main/ponyDiffusionV6XL_v6StartWithThisOne.safetensors"
 
-# FemboysXL LoRA - civitai:289006@324974 (kept on Civitai, no verified HF mirror found)
+# LoRAs - femboy/sissy set (no verified HF mirrors found, kept on Civitai)
 RUN curl -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/FemboysXL.safetensors \
-      "https://civitai.com/api/download/models/324974?token=${CIVITAI_TOKEN}"
+      -o models/loras/SissyFemboyEnhancer.safetensors \
+      "https://civitai.com/api/download/models/1537610?token=${CIVITAI_TOKEN}" && \
+    curl -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/FemboySissy.safetensors \
+      "https://civitai.com/api/download/models/677052?token=${CIVITAI_TOKEN}" && \
+    curl -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/FemboySissyFeminineMale.safetensors \
+      "https://civitai.com/api/download/models/2176308?token=${CIVITAI_TOKEN}"
+
+# Upscale model for FaceDetailer / hires pass (verified mirror, SHA256 a5812231fc93... matches original)
+RUN curl -L \
+      -o models/upscale_models/4x-UltraSharp.pth \
+      "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth"
+
+# Face detection model for FaceDetailer (UltralyticsDetectorProvider bbox model)
+RUN curl -L \
+      -o models/ultralytics/bbox/face_yolov8m.pt \
+      "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
 
 # Stage 3: Final image
 FROM base AS final
