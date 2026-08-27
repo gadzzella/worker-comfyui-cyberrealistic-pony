@@ -20,7 +20,7 @@ ENV PYTHONUNBUFFERED=1
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
 # Install Python, git and other necessary tools
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3.12-venv \
     git \
@@ -127,17 +127,18 @@ CMD ["/start.sh"]
 FROM base AS downloader
 
 ARG HUGGINGFACE_ACCESS_TOKEN
+ARG CIVITAI_TOKEN
 # Set default model type if none is provided
 ARG MODEL_TYPE=flux1-dev-fp8
 
 # Install curl (not present in nvidia/cuda base image)
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 # Change working directory to ComfyUI
 WORKDIR /comfyui
 
 # Create necessary directories upfront
-RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/model_patches models/upscale_models models/ultralytics/bbox
+RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/model_patches models/upscale_models models/ultralytics/bbox models/loras
 
 # Download checkpoints/vae/unet/clip models to include in image based on model type
 RUN if [ "$MODEL_TYPE" = "sdxl" ]; then \
@@ -175,45 +176,68 @@ RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
       wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/model_patches/Z-Image-Turbo-Fun-Controlnet-Union.safetensors https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union.safetensors; \
     fi
 
-# CyberRealisticPony checkpoint + LoRA
-ARG CIVITAI_TOKEN
-RUN mkdir -p models/loras && \
-    curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      --location-trusted \
-      -o models/checkpoints/CyberRealisticPony_V18.0_F16.safetensors \
-      "https://huggingface.co/cyberdelia/CyberRealisticPony/resolve/main/CyberRealisticPony_V18.0_F16.safetensors" && \
-    curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      --location-trusted \
-      -o models/loras/ExpressiveH.safetensors \
-      "https://huggingface.co/SeyrolART/ExpressiveH/resolve/main/Expressive_H-000001.safetensors"
+# -------------------------------------------------------------
+# Checkpoints: Pony Realism v2.2 (Pony base) + RealVisXL V5.0 (SDXL base)
+# -------------------------------------------------------------
+# 1. Pony Replacement: Pony Realism v2.2 (flat-file mirror; the original
+#    TheImposterImposters/PonyRealism-v2.2MainVAE repo is diffusers-format
+#    only and has no single .safetensors file ComfyUI can load directly)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/checkpoints/ponyRealism_v22MainVAE.safetensors \
+      "https://huggingface.co/Ine007/ponyRealism_v22MainVAE/resolve/main/ponyRealism_v22MainVAE.safetensors"
 
-# Pony Diffusion V6 XL checkpoint (verified HF mirror, SHA256 matches official Civitai hash 67ab2fd8ec...)
-RUN curl -L --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
+# 2. Non-Pony Replacement: RealVisXL V5.0 (Pure SDXL Photorealism)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
       --location-trusted \
-      -o models/checkpoints/PonyDiffusionV6XL.safetensors \
-      "https://huggingface.co/LyliaEngine/Pony_Diffusion_V6_XL/resolve/main/ponyDiffusionV6XL_v6StartWithThisOne.safetensors"
+      -o models/checkpoints/RealVisXL_V5.0_fp16.safetensors \
+      "https://huggingface.co/SG161222/RealVisXL_V5.0/resolve/main/RealVisXL_V5.0_fp16.safetensors"
 
-# LoRAs - femboy/sissy set (no verified HF mirrors found, kept on Civitai)
-RUN curl -L \
+# 3. Hand Detection Model for FaceDetailer / Impact Pack
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/ultralytics/bbox/hand_yolov8n.pt \
+      "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt"
+
+# -------------------------------------------------------------
+# LoRAs for Pony Realism v2.2
+# -------------------------------------------------------------
+# 1. Realism Lora By Stable Yogi (Pony) v3.0_lite
+# 2. comics
+# 3. aworship
+RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/SissyFemboyEnhancer.safetensors \
-      "https://civitai.com/api/download/models/1537610?token=${CIVITAI_TOKEN}" && \
-    curl -L \
+      -o models/loras/Pony_Realism_StableYogi.safetensors \
+      "https://civitai.com/api/download/models/2074888?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/FemboySissy.safetensors \
-      "https://civitai.com/api/download/models/677052?token=${CIVITAI_TOKEN}" && \
-    curl -L \
+      -o models/loras/Pony_Comics.safetensors \
+      "https://civitai.com/api/download/models/653473?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/FemboySissyFeminineMale.safetensors \
-      "https://civitai.com/api/download/models/2176308?token=${CIVITAI_TOKEN}"
+      -o models/loras/Pony_AWorship.safetensors \
+      "https://civitai.com/api/download/models/516895?token=${CIVITAI_TOKEN}"
+
+# -------------------------------------------------------------
+# LoRAs for RealVisXL V5.0 (Standard SDXL)
+# -------------------------------------------------------------
+# 1. Detail Tweaker XL
+# 2. NSFW POV All In One SDXL
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/SDXL_Detail_Tweaker.safetensors \
+      "https://civitai.com/api/download/models/135867?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/SDXL_NSFW_POV_AllInOne.safetensors \
+      "https://civitai.com/api/download/models/160240?token=${CIVITAI_TOKEN}"
 
 # Upscale model for FaceDetailer / hires pass (verified mirror, SHA256 a5812231fc93... matches original)
-RUN curl -L \
+RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/upscale_models/4x-UltraSharp.pth \
       "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth"
 
 # Face detection model for FaceDetailer (UltralyticsDetectorProvider bbox model)
-RUN curl -L \
+RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/ultralytics/bbox/face_yolov8m.pt \
       "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
 
