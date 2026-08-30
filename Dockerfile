@@ -177,21 +177,18 @@ RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
     fi
 
 # -------------------------------------------------------------
-# Checkpoints: Pony Realism v2.2 (Pony base) + RealVisXL V5.0 (SDXL base)
+# Checkpoints: Pony Realism v2.2 + Fucktastic Real v5.2 (porn machine)
 # -------------------------------------------------------------
-# 1. Pony Replacement: Pony Realism v2.2 (flat-file mirror; the original
-#    TheImposterImposters/PonyRealism-v2.2MainVAE repo is diffusers-format
-#    only and has no single .safetensors file ComfyUI can load directly)
+# 1. Pony Realism v2.2
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/checkpoints/ponyRealism_v22MainVAE.safetensors \
       "https://huggingface.co/Ine007/ponyRealism_v22MainVAE/resolve/main/ponyRealism_v22MainVAE.safetensors"
 
-# 2. Non-Pony Replacement: RealVisXL V5.0 (Pure SDXL Photorealism)
+# 2. Fucktastic Real v5.2 (Pony/PDXL porn-generating machine)
 RUN curl -f --retry 3 --retry-delay 5 -L \
-      --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      --location-trusted \
-      -o models/checkpoints/RealVisXL_V5.0_fp16.safetensors \
-      "https://huggingface.co/SG161222/RealVisXL_V5.0/resolve/main/RealVisXL_V5.0_fp16.safetensors"
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/checkpoints/FucktasticReal_v52.safetensors \
+      "https://civitai.com/api/download/models/2320801?token=${CIVITAI_TOKEN}"
 
 # 3. Hand Detection Model for FaceDetailer / Impact Pack
 RUN curl -f --retry 3 --retry-delay 5 -L \
@@ -199,11 +196,9 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8n.pt"
 
 # -------------------------------------------------------------
-# LoRAs for Pony Realism v2.2
+# LoRAs for Pony Realism / Fucktastic Real
 # -------------------------------------------------------------
-# 1. Realism Lora By Stable Yogi (Pony) v3.0_lite
-# 2. comics
-# 3. aworship
+# Existing ones you wanted to keep
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/Pony_Realism_StableYogi.safetensors \
@@ -217,19 +212,47 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/Pony_AWorship.safetensors \
       "https://civitai.com/api/download/models/516895?token=${CIVITAI_TOKEN}"
 
-# -------------------------------------------------------------
-# LoRAs for RealVisXL V5.0 (Standard SDXL)
-# -------------------------------------------------------------
-# 1. Detail Tweaker XL
-# 2. NSFW POV All In One SDXL
+# Round ass + anal
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/SDXL_Detail_Tweaker.safetensors \
-      "https://civitai.com/api/download/models/135867?token=${CIVITAI_TOKEN}" && \
+      -o models/loras/PerfectAssSlider_Pony.safetensors \
+      "https://civitai.com/api/download/models/1190779?token=${CIVITAI_TOKEN}" && \
     curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/SDXL_NSFW_POV_AllInOne.safetensors \
-      "https://civitai.com/api/download/models/160240?token=${CIVITAI_TOKEN}"
+      -o models/loras/BubbleButtSlider_Pony.safetensors \
+      "https://civitai.com/api/download/models/479344?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/AssImplants_PonyXL.safetensors \
+      "https://civitai.com/api/download/models/733815?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/PerfectAnal_AIO_Tana_v22.safetensors \
+      "https://civitai.com/api/download/models/2385121?token=${CIVITAI_TOKEN}"
+
+# Breast size control (small / perky for slim-thick)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/BreastsSizeSlider_Pony.safetensors \
+      "https://civitai.com/api/download/models/558208?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/PerfectBreasts_Pony_v2.safetensors \
+      "https://civitai.com/api/download/models/1621732?token=${CIVITAI_TOKEN}"
+
+# Porn helpers (excessive cum + detailed genitals)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/ExcessiveCum_Pony.safetensors \
+      "https://civitai.com/api/download/models/595414?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/DetailedPussy_Pony.safetensors \
+      "https://civitai.com/api/download/models/918672?token=${CIVITAI_TOKEN}" && \
+    curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/CumCore_PonyXL.safetensors \
+      "https://civitai.com/api/download/models/1295024?token=${CIVITAI_TOKEN}"
 
 # Upscale model for FaceDetailer / hires pass (verified mirror, SHA256 a5812231fc93... matches original)
 RUN curl -f --retry 3 --retry-delay 5 -L \
