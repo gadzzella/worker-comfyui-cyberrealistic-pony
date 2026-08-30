@@ -220,7 +220,7 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
     curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/BubbleButtSlider_Pony.safetensors \
-      "https://civitai.com/api/download/models/479344?token=${CIVITAI_TOKEN}" && \
+      "https://civitai.com/api/download/models/533085?token=${CIVITAI_TOKEN}" && \
     curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/AssImplants_PonyXL.safetensors \
@@ -229,16 +229,6 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/PerfectAnal_AIO_Tana_v22.safetensors \
       "https://civitai.com/api/download/models/2385121?token=${CIVITAI_TOKEN}"
-
-# Breast size control (small / perky for slim-thick)
-RUN curl -f --retry 3 --retry-delay 5 -L \
-      --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/BreastsSizeSlider_Pony.safetensors \
-      "https://civitai.com/api/download/models/558208?token=${CIVITAI_TOKEN}" && \
-    curl -f --retry 3 --retry-delay 5 -L \
-      --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/PerfectBreasts_Pony_v2.safetensors \
-      "https://civitai.com/api/download/models/1621732?token=${CIVITAI_TOKEN}"
 
 # Porn helpers (excessive cum + detailed genitals)
 RUN curl -f --retry 3 --retry-delay 5 -L \
