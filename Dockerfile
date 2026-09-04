@@ -19,10 +19,28 @@ ENV PYTHONUNBUFFERED=1
 # Speed up some cmake builds
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
+# ---------------------------------------------------------------------------
+# Performance precautions (no behavior change, just faster/safer defaults)
+# ---------------------------------------------------------------------------
+# Cache compiled Triton/Inductor kernels instead of recompiling every time
+# they're first hit in a process. Default here is an in-container path (lost
+# on pod restart). If you attach a RunPod network volume, override these at
+# deploy time to e.g. /runpod-volume/.cache/triton and .../inductor so the
+# cache survives across cold starts entirely.
+ENV TRITON_CACHE_DIR=/tmp/.triton-cache
+ENV TORCHINDUCTOR_CACHE_DIR=/tmp/.inductor-cache
+# Let safetensors load weights more directly onto the GPU instead of staging
+# fully through host RAM first — cuts model load time.
+ENV SAFETENSORS_FAST_GPU=1
+# Reduce PyTorch CUDA allocator fragmentation across multi-stage graphs
+# (base pass -> hires pass -> FaceDetailer all allocate/free repeatedly).
+ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 # Install Python, git and other necessary tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3.12-venv \
+    python3.12-dev \
     git \
     wget \
     libgl1 \
@@ -32,6 +50,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     ffmpeg \
     openssh-server \
+    build-essential \
+    ninja-build \
     && ln -sf /usr/bin/python3.12 /usr/bin/python \
     && ln -sf /usr/bin/pip3 /usr/bin/pip
 
@@ -112,6 +132,21 @@ RUN uv pip install runpod requests websocket-client
 # Add application code and scripts
 ADD src/start.sh src/network_volume.py handler.py test_input.json ./
 RUN chmod +x /start.sh
+
+# Safeguard: guarantee ComfyUI is launched with --gpu-only, regardless of what
+# start.sh already contains. --gpu-only forces the model to stay resident in
+# VRAM instead of ComfyUI's automatic offload-to-system-RAM under memory
+# pressure, which is what causes generation to slow down mid-run. Idempotent:
+# if start.sh already launches main.py with --gpu-only (as the upstream
+# worker-comfyui start.sh does), this is a no-op; otherwise it inserts the
+# flag right after every "main.py" invocation.
+RUN if grep -q -- '--gpu-only' /start.sh; then \
+      echo "start.sh: --gpu-only already present, leaving untouched"; \
+    else \
+      sed -i 's/main\.py/main.py --gpu-only/' /start.sh; \
+      echo "start.sh: injected --gpu-only"; \
+    fi \
+    && grep -q -- '--gpu-only' /start.sh
 
 # Prevent pip from asking for confirmation during uninstall steps in custom nodes
 ENV PIP_NO_INPUT=1
