@@ -217,12 +217,12 @@ RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
     fi
 
 # -------------------------------------------------------------
-# Krea 2 Turbo All-in-One SVDQuant (12.77 GB)
+# Krea 2 Turbo All-in-One SVDQuant (≈12.77–13.7 GB)
 # Includes quantized DiT + 4-bit text encoder + VAE
 # -------------------------------------------------------------
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/checkpoints/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors \
-      "https://huggingface.co/AlperKTS/Krea-2-SVDQuant-ComfyUI/resolve/main/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors"
+      "https://huggingface.co/AlperKTS/Krea-2-SVDQuant-ComfyUI/resolve/main/checkpoints/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors"
 
 # -------------------------------------------------------------
 # Krea 2 LoRAs
