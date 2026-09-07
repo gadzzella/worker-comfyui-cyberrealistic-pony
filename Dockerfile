@@ -243,7 +243,7 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/Krea2_TextFusion_Refusal_Reduction.safetensors \
-      "https://civitai.com/api/download/models/2775340?token=${CIVITAI_TOKEN}"
+      "https://civitai.com/api/download/models/3125118?token=${CIVITAI_TOKEN}"
 
 # Upscale model for FaceDetailer / hires pass (verified mirror, SHA256 a5812231fc93... matches original)
 RUN curl -f --retry 3 --retry-delay 5 -L \
