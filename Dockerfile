@@ -72,7 +72,7 @@ RUN uv pip install comfy-cli pip setuptools wheel
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
-      /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
+      /usr/bin/yes | comfy --workspace /comfyui install --version "\( {COMFYUI_VERSION}" --cuda-version " \){CUDA_VERSION_FOR_COMFY}" --nvidia; \
     else \
       /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
     fi
@@ -90,6 +90,11 @@ RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
 RUN comfy-node-install comfyui-impact-pack comfyui-impact-subpack
+
+# -------------------------------------------------------------
+# Required for the SVDQuant All-in-One checkpoint
+# -------------------------------------------------------------
+RUN git clone https://github.com/alperktt/Krea-2-SVDQuant-ComfyUI /comfyui/custom_nodes/krea-2-svdquant
 
 # comfy-cli installs ComfyUI into its own workspace venv (/comfyui/.venv), but
 # start.sh launches ComfyUI with /opt/venv's python. That mismatch leaves the
@@ -212,24 +217,33 @@ RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
     fi
 
 # -------------------------------------------------------------
-# Krea 2 Checkpoint
+# Krea 2 Turbo All-in-One SVDQuant (12.77 GB)
+# Includes quantized DiT + 4-bit text encoder + VAE
 # -------------------------------------------------------------
 RUN curl -f --retry 3 --retry-delay 5 -L \
-      --header "User-Agent: Mozilla/5.0" \
-      -o models/checkpoints/gonzaLomoKrea2_v40_fp8_AIO.safetensors \
-      "https://civitai.com/api/download/models/3245099?fileId=3140733&token=${CIVITAI_TOKEN}"
+      -o models/checkpoints/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors \
+      "https://huggingface.co/AlperKTS/Krea-2-SVDQuant-ComfyUI/resolve/main/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors"
 
 # -------------------------------------------------------------
 # Krea 2 LoRAs
 # -------------------------------------------------------------
+# Realism / snapshot style
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/RealisticSnapshotKrea2.safetensors \
-      "https://civitai.com/api/download/models/3084537?fileId=2963911&token=${CIVITAI_TOKEN}" && \
-    curl -f --retry 3 --retry-delay 5 -L \
+      "https://civitai.com/api/download/models/3084537?fileId=2963911&token=${CIVITAI_TOKEN}"
+
+# Main NSFW capability LoRA
+RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/Krea2_AIO_NSFW.safetensors \
       "https://civitai.com/api/download/models/3071904?fileId=2950820&token=${CIVITAI_TOKEN}"
+
+# Refusal / censorship reduction (highly recommended with base Turbo)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/Krea2_TextFusion_Refusal_Reduction.safetensors \
+      "https://civitai.com/api/download/models/2775340?token=${CIVITAI_TOKEN}"
 
 # Upscale model for FaceDetailer / hires pass (verified mirror, SHA256 a5812231fc93... matches original)
 RUN curl -f --retry 3 --retry-delay 5 -L \
