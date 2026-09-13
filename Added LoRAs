@@ -225,7 +225,7 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       "https://huggingface.co/AlperKTS/Krea-2-SVDQuant-ComfyUI/resolve/main/checkpoints/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors"
 
 # -------------------------------------------------------------
-# Krea 2 LoRAs
+# Krea 3 LoRAs
 # -------------------------------------------------------------
 # Realism / snapshot style
 RUN curl -f --retry 3 --retry-delay 5 -L \
@@ -233,11 +233,23 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/RealisticSnapshotKrea2.safetensors \
       "https://civitai.com/api/download/models/3084537?fileId=2963911&token=${CIVITAI_TOKEN}"
 
-# Main NSFW capability LoRA
+# BeMyHero - NylaX
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/Krea2_AIO_NSFW.safetensors \
-      "https://civitai.com/api/download/models/3071904?fileId=2950820&token=${CIVITAI_TOKEN}"
+      -o models/loras/BeMyHero_NylaX_Krea2.safetensors \
+      "https://civitai.com/api/download/models/3206740?fileId=3088255&token=${CIVITAI_TOKEN}"
+
+# RLY Thot Shot - Aspen
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/RLY_Thot_Shot_Aspen_Krea2.safetensors \
+      "https://civitai.com/api/download/models/3071791?fileId=2951279&token=${CIVITAI_TOKEN}"
+      
+# SNOFS
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/SNOFS_Krea2.safetensors \
+      "https://civitai.com/api/download/models/3290120?fileId=3174557&token=${CIVITAI_TOKEN}"
 
 # Refusal / censorship reduction (highly recommended with base Turbo)
 RUN curl -f --retry 3 --retry-delay 5 -L \
