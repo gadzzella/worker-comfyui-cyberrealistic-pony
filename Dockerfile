@@ -12,28 +12,16 @@ ARG PYTORCH_INDEX_URL
 
 # Prevents prompts from packages asking for user input during installation
 ENV DEBIAN_FRONTEND=noninteractive
-# Prefer binary wheels over source distributions for faster pip installations
 ENV PIP_PREFER_BINARY=1
-# Ensures output from python is printed immediately to the terminal without buffering
 ENV PYTHONUNBUFFERED=1
-# Speed up some cmake builds
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
 # ---------------------------------------------------------------------------
-# Performance precautions (no behavior change, just faster/safer defaults)
+# Performance precautions
 # ---------------------------------------------------------------------------
-# Cache compiled Triton/Inductor kernels instead of recompiling every time
-# they're first hit in a process. Default here is an in-container path (lost
-# on pod restart). If you attach a RunPod network volume, override these at
-# deploy time to e.g. /runpod-volume/.cache/triton and .../inductor so the
-# cache survives across cold starts entirely.
 ENV TRITON_CACHE_DIR=/tmp/.triton-cache
 ENV TORCHINDUCTOR_CACHE_DIR=/tmp/.inductor-cache
-# Let safetensors load weights more directly onto the GPU instead of staging
-# fully through host RAM first — cuts model load time.
 ENV SAFETENSORS_FAST_GPU=1
-# Reduce PyTorch CUDA allocator fragmentation across multi-stage graphs
-# (base pass -> hires pass -> FaceDetailer all allocate/free repeatedly).
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 # Install Python, git and other necessary tools
@@ -72,7 +60,7 @@ RUN uv pip install comfy-cli pip setuptools wheel
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
-      /usr/bin/yes | comfy --workspace /comfyui install --version "\( {COMFYUI_VERSION}" --cuda-version " \){CUDA_VERSION_FOR_COMFY}" --nvidia; \
+      /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
     else \
       /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
     fi
@@ -82,44 +70,19 @@ RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
       uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
     fi
 
-# Install custom nodes needed for FaceDetailer (Impact Pack + Subpack for
-# UltralyticsDetectorProvider). Installed here, BEFORE the requirements loop
-# and smoke test below, so their dependencies get picked up by that loop and
-# land in /opt/venv (the launch venv) instead of comfy-cli's own /comfyui/.venv,
-# and so a broken import is caught by the smoke test at build time.
+# Install custom nodes needed for FaceDetailer
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
 RUN comfy-node-install comfyui-impact-pack comfyui-impact-subpack
 
-# -------------------------------------------------------------
-# Required for the SVDQuant All-in-One checkpoint
-# -------------------------------------------------------------
-RUN git clone https://github.com/alperktt/Krea-2-SVDQuant-ComfyUI /comfyui/custom_nodes/krea-2-svdquant
-
-# comfy-cli installs ComfyUI into its own workspace venv (/comfyui/.venv), but
-# start.sh launches ComfyUI with /opt/venv's python. That mismatch leaves the
-# launch venv missing ComfyUI's runtime deps (e.g. sqlalchemy, pulled in by
-# ComfyUI's asset DB), so ComfyUI crashes at startup and surfaces as the
-# misleading "ComfyUI server (127.0.0.1:8188) not reachable" error. Mirror
-# ComfyUI's full dependency set (core + custom nodes) into /opt/venv so the
-# launch venv is complete. Root-cause fix for DR-1170.
-#
-# The transformers/huggingface-hub pin is part of the SAME step on purpose:
-# ComfyUI declares transformers>=4.50.3 and huggingface-hub with NO upper bound,
-# so a fresh install can pull transformers 5.x / huggingface-hub 1.x whose
-# breaking API changes also crash ComfyUI at startup. Pinning them in the same
-# RUN downgrades within one layer, so the unwanted versions aren't left behind
-# bloating the image.
+# Install runtime dependencies for ComfyUI and custom nodes
 RUN uv pip install -r /comfyui/requirements.txt \
     && for r in /comfyui/custom_nodes/*/requirements.txt; do \
          [ -f "$r" ] && uv pip install -r "$r" || true; \
        done \
     && uv pip install "transformers>=4.50.3,<5" "huggingface-hub<1.0"
 
-# Build-time smoke test: actually start ComfyUI (imports the full node graph) so
-# a startup-breaking dependency is caught HERE, at build time, instead of as a
-# runtime "server not reachable" failure on a live worker. Runs on CPU — no GPU
-# needed to exercise the import graph.
+# Build-time smoke test
 RUN cd /comfyui && timeout 300 python main.py --quick-test-for-ci --cpu
 
 # Change working directory to ComfyUI
@@ -138,13 +101,7 @@ RUN uv pip install runpod requests websocket-client
 ADD src/start.sh src/network_volume.py handler.py test_input.json ./
 RUN chmod +x /start.sh
 
-# Safeguard: guarantee ComfyUI is launched with --gpu-only, regardless of what
-# start.sh already contains. --gpu-only forces the model to stay resident in
-# VRAM instead of ComfyUI's automatic offload-to-system-RAM under memory
-# pressure, which is what causes generation to slow down mid-run. Idempotent:
-# if start.sh already launches main.py with --gpu-only (as the upstream
-# worker-comfyui start.sh does), this is a no-op; otherwise it inserts the
-# flag right after every "main.py" invocation.
+# Guarantee ComfyUI is launched with --gpu-only
 RUN if grep -q -- '--gpu-only' /start.sh; then \
       echo "start.sh: --gpu-only already present, leaving untouched"; \
     else \
@@ -153,14 +110,12 @@ RUN if grep -q -- '--gpu-only' /start.sh; then \
     fi \
     && grep -q -- '--gpu-only' /start.sh
 
-# Prevent pip from asking for confirmation during uninstall steps in custom nodes
 ENV PIP_NO_INPUT=1
 
 # Copy helper script to switch Manager network mode at container start
 COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
 RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 
-# Set the default command to run when starting the container
 CMD ["/start.sh"]
 
 # Stage 2: Download models
@@ -168,64 +123,39 @@ FROM base AS downloader
 
 ARG HUGGINGFACE_ACCESS_TOKEN
 ARG CIVITAI_TOKEN
-# Set default model type if none is provided
-ARG MODEL_TYPE=flux1-dev-fp8
 
-# Install curl (not present in nvidia/cuda base image)
+# Install curl
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
-# Change working directory to ComfyUI
 WORKDIR /comfyui
 
-# Create necessary directories upfront
-RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/model_patches models/upscale_models models/ultralytics/bbox models/loras
-
-# Download checkpoints/vae/unet/clip models to include in image based on model type
-RUN if [ "$MODEL_TYPE" = "sdxl" ]; then \
-      wget -q -O models/checkpoints/sd_xl_base_1.0.safetensors https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors && \
-      wget -q -O models/vae/sdxl_vae.safetensors https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors && \
-      wget -q -O models/vae/sdxl-vae-fp16-fix.safetensors https://huggingface.co/madebyollin/sdxl-vae-fp16-fix/resolve/main/sdxl_vae.safetensors; \
-    fi
-
-RUN if [ "$MODEL_TYPE" = "sd3" ]; then \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/checkpoints/sd3_medium_incl_clips_t5xxlfp8.safetensors https://huggingface.co/stabilityai/stable-diffusion-3-medium/resolve/main/sd3_medium_incl_clips_t5xxlfp8.safetensors; \
-    fi
-
-RUN if [ "$MODEL_TYPE" = "flux1-schnell" ]; then \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/unet/flux1-schnell.safetensors https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors && \
-      wget -q -O models/clip/clip_l.safetensors https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors && \
-      wget -q -O models/clip/t5xxl_fp8_e4m3fn.safetensors https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors && \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/vae/ae.safetensors https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors; \
-    fi
-
-RUN if [ "$MODEL_TYPE" = "flux1-dev" ]; then \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/unet/flux1-dev.safetensors https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/flux1-dev.safetensors && \
-      wget -q -O models/clip/clip_l.safetensors https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors && \
-      wget -q -O models/clip/t5xxl_fp8_e4m3fn.safetensors https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors && \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/vae/ae.safetensors https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors; \
-    fi
-
-RUN if [ "$MODEL_TYPE" = "flux1-dev-fp8" ]; then \
-      wget -q -O models/checkpoints/flux1-dev-fp8.safetensors https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors; \
-    fi
-
-RUN if [ "$MODEL_TYPE" = "z-image-turbo" ]; then \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/text_encoders/qwen_3_4b.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors && \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/diffusion_models/z_image_turbo_bf16.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/diffusion_models/z_image_turbo_bf16.safetensors && \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/vae/ae.safetensors https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors && \
-      wget -q --header="Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" -O models/model_patches/Z-Image-Turbo-Fun-Controlnet-Union.safetensors https://huggingface.co/alibaba-pai/Z-Image-Turbo-Fun-Controlnet-Union/resolve/main/Z-Image-Turbo-Fun-Controlnet-Union.safetensors; \
-    fi
+# Create necessary directories
+RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/upscale_models models/ultralytics/bbox models/loras
 
 # -------------------------------------------------------------
-# Krea 2 Turbo All-in-One SVDQuant (≈12.77–13.7 GB)
-# Includes quantized DiT + 4-bit text encoder + VAE
+# Krea 2 Turbo FP8 / Native Standard Checkpoints
 # -------------------------------------------------------------
+# Krea 2 Turbo Diffusion Model (FP8 precision for high quality & smooth VRAM usage)
 RUN curl -f --retry 3 --retry-delay 5 -L \
-      -o models/checkpoints/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors \
-      "https://huggingface.co/AlperKTS/Krea-2-SVDQuant-ComfyUI/resolve/main/checkpoints/Krea2-Turbo-AllInOne-SVDQuant-W4A4-rank256-actaware-TEW4A4.safetensors"
+      --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
+      -o models/diffusion_models/krea-2-turbo-fp8.safetensors \
+      "https://huggingface.co/Comfy-Org/Krea-2-Turbo/resolve/main/split_files/diffusion_models/krea-2-turbo-fp8.safetensors" || \
+    curl -f --retry 3 --retry-delay 5 -L \
+      -o models/checkpoints/krea-2-turbo-fp8.safetensors \
+      "https://huggingface.co/Comfy-Org/Krea-2-Turbo/resolve/main/krea-2-turbo-fp8.safetensors"
+
+# High-Precision Text Encoder (Qwen3-VL 4B / T5-XXL standard for Krea 2)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/text_encoders/qwen_3_4b_fp8.safetensors \
+      "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
+
+# Official VAE
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/vae/ae.safetensors \
+      "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors"
 
 # -------------------------------------------------------------
-# Krea 3 LoRAs
+# Krea 2 LoRAs (Fully compatible with FP8 standard weights)
 # -------------------------------------------------------------
 # Realism / snapshot style
 RUN curl -f --retry 3 --retry-delay 5 -L \
@@ -251,18 +181,18 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/SNOFS_Krea2.safetensors \
       "https://civitai.com/api/download/models/3290120?fileId=3174557&token=${CIVITAI_TOKEN}"
 
-# Refusal / censorship reduction (highly recommended with base Turbo)
+# Refusal / censorship reduction
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/Krea2_TextFusion_Refusal_Reduction.safetensors \
       "https://civitai.com/api/download/models/3125118?token=${CIVITAI_TOKEN}"
 
-# Upscale model for FaceDetailer / hires pass (verified mirror, SHA256 a5812231fc93... matches original)
+# Upscale model for FaceDetailer / hires pass
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/upscale_models/4x-UltraSharp.pth \
       "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth"
 
-# Face detection model for FaceDetailer (UltralyticsDetectorProvider bbox model)
+# Face detection model for FaceDetailer
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/ultralytics/bbox/face_yolov8m.pt \
       "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
