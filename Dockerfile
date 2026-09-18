@@ -133,24 +133,24 @@ WORKDIR /comfyui
 RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/upscale_models models/ultralytics/bbox models/loras
 
 # -------------------------------------------------------------
-# Krea 2 Turbo FP8 / Native Standard Checkpoints
+# Krea 2 / FLUX FP8 Model Components (Verified URLs)
 # -------------------------------------------------------------
-# Krea 2 Turbo Diffusion Model (FP8 precision for high quality & smooth VRAM usage)
+# Unet / Diffusion Model (FP8)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/unet/flux1-dev-fp8.safetensors \
+      "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors"
+
+# Text Encoders (CLIP-L & T5-XXL FP8)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/clip/clip_l.safetensors \
+      "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" && \
+    curl -f --retry 3 --retry-delay 5 -L \
+      -o models/clip/t5xxl_fp8_e4m3fn.safetensors \
+      "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors"
+
+# VAE
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      -o models/diffusion_models/krea-2-turbo-fp8.safetensors \
-      "https://huggingface.co/Comfy-Org/Krea-2-Turbo/resolve/main/split_files/diffusion_models/krea-2-turbo-fp8.safetensors" || \
-    curl -f --retry 3 --retry-delay 5 -L \
-      -o models/checkpoints/krea-2-turbo-fp8.safetensors \
-      "https://huggingface.co/Comfy-Org/Krea-2-Turbo/resolve/main/krea-2-turbo-fp8.safetensors"
-
-# High-Precision Text Encoder (Qwen3-VL 4B / T5-XXL standard for Krea 2)
-RUN curl -f --retry 3 --retry-delay 5 -L \
-      -o models/text_encoders/qwen_3_4b_fp8.safetensors \
-      "https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/text_encoders/qwen_3_4b.safetensors"
-
-# Official VAE
-RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/vae/ae.safetensors \
       "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors"
 
