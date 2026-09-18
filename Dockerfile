@@ -4,33 +4,30 @@ ARG BASE_IMAGE=nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 # Stage 1: Base image with common dependencies
 FROM ${BASE_IMAGE} AS base
 
-# Build arguments for this stage with sensible defaults for standalone builds
 ARG COMFYUI_VERSION=latest
 ARG CUDA_VERSION_FOR_COMFY
 ARG ENABLE_PYTORCH_UPGRADE=false
 ARG PYTORCH_INDEX_URL
 
-# Prevents prompts from packages asking for user input during installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_PREFER_BINARY=1
 ENV PYTHONUNBUFFERED=1
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
-# ---------------------------------------------------------------------------
-# Performance precautions
-# ---------------------------------------------------------------------------
+# Performance
 ENV TRITON_CACHE_DIR=/tmp/.triton-cache
 ENV TORCHINDUCTOR_CACHE_DIR=/tmp/.inductor-cache
 ENV SAFETENSORS_FAST_GPU=1
 ENV PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# Install Python, git and other necessary tools
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.12 \
     python3.12-venv \
     python3.12-dev \
     git \
     wget \
+    curl \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
@@ -41,41 +38,47 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ninja-build \
     && ln -sf /usr/bin/python3.12 /usr/bin/python \
-    && ln -sf /usr/bin/pip3 /usr/bin/pip
+    && ln -sf /usr/bin/pip3 /usr/bin/pip \
+    && apt-get autoremove -y \
+    && apt-get clean -y \
+    && rm -rf /var/lib/apt/lists/*
 
-# Clean up to reduce image size
-RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
-
-# Install uv (latest) using official installer and create isolated venv
+# Install uv and create isolated venv
 RUN wget -qO- https://astral.sh/uv/install.sh | sh \
     && ln -s /root/.local/bin/uv /usr/local/bin/uv \
     && ln -s /root/.local/bin/uvx /usr/local/bin/uvx \
     && uv venv /opt/venv
 
-# Use the virtual environment for all subsequent commands
 ENV PATH="/opt/venv/bin:${PATH}"
 
-# Install comfy-cli + dependencies needed by it to install ComfyUI
+# Install comfy-cli
 RUN uv pip install comfy-cli pip setuptools wheel
 
 # Install ComfyUI
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
-      /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
+      /usr/bin/yes | comfy --workspace /comfyui install \
+        --version "${COMFYUI_VERSION}" \
+        --cuda-version "${CUDA_VERSION_FOR_COMFY}" \
+        --nvidia; \
     else \
-      /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
+      /usr/bin/yes | comfy --workspace /comfyui install \
+        --version "${COMFYUI_VERSION}" \
+        --nvidia; \
     fi
 
-# Upgrade PyTorch if needed (for newer CUDA versions)
+# Optional PyTorch upgrade
 RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
-      uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
+      uv pip install --force-reinstall torch torchvision torchaudio \
+        --index-url "${PYTORCH_INDEX_URL}"; \
     fi
 
-# Install custom nodes needed for FaceDetailer
+# Custom nodes needed by FaceDetailer
 COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
 RUN chmod +x /usr/local/bin/comfy-node-install
+
 RUN comfy-node-install comfyui-impact-pack comfyui-impact-subpack
 
-# Install runtime dependencies for ComfyUI and custom nodes
+# Runtime dependencies
 RUN uv pip install -r /comfyui/requirements.txt \
     && for r in /comfyui/custom_nodes/*/requirements.txt; do \
          [ -f "$r" ] && uv pip install -r "$r" || true; \
@@ -85,23 +88,21 @@ RUN uv pip install -r /comfyui/requirements.txt \
 # Build-time smoke test
 RUN cd /comfyui && timeout 300 python main.py --quick-test-for-ci --cpu
 
-# Change working directory to ComfyUI
 WORKDIR /comfyui
 
-# Support for the network volume
+# Network volume configuration
 ADD src/extra_model_paths.yaml ./
 
-# Go back to the root
 WORKDIR /
 
-# Install Python runtime dependencies for the handler
+# RunPod/runtime dependencies
 RUN uv pip install runpod requests websocket-client
 
-# Add application code and scripts
+# Application code
 ADD src/start.sh src/network_volume.py handler.py test_input.json ./
 RUN chmod +x /start.sh
 
-# Guarantee ComfyUI is launched with --gpu-only
+# Guarantee --gpu-only
 RUN if grep -q -- '--gpu-only' /start.sh; then \
       echo "start.sh: --gpu-only already present, leaving untouched"; \
     else \
@@ -112,52 +113,70 @@ RUN if grep -q -- '--gpu-only' /start.sh; then \
 
 ENV PIP_NO_INPUT=1
 
-# Copy helper script to switch Manager network mode at container start
+# ComfyUI Manager network mode helper
 COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
 RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 
 CMD ["/start.sh"]
 
-# Stage 2: Download models
+
+# ============================================================================
+# Stage 2: Download Krea 2 models
+# ============================================================================
 FROM base AS downloader
 
-ARG HUGGINGFACE_ACCESS_TOKEN
 ARG CIVITAI_TOKEN
-
-# Install curl
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /comfyui
 
-# Create necessary directories
-RUN mkdir -p models/checkpoints models/vae models/unet models/clip models/text_encoders models/diffusion_models models/upscale_models models/ultralytics/bbox models/loras
+# Krea 2 directory structure
+RUN mkdir -p \
+    models/checkpoints \
+    models/vae \
+    models/unet \
+    models/clip \
+    models/text_encoders \
+    models/diffusion_models \
+    models/upscale_models \
+    models/ultralytics/bbox \
+    models/loras
 
-# -------------------------------------------------------------
-# Krea 2 / FLUX FP8 Model Components (Verified URLs)
-# -------------------------------------------------------------
-# Unet / Diffusion Model (FP8)
+
+# ============================================================================
+# KREA 2 TURBO
+#
+# 48 GB GPU:
+# - Use the official ComfyUI FP8-scaled Turbo model.
+# - It is ~13.1 GB and leaves substantial VRAM for the Qwen encoder,
+#   VAE, LoRAs, ComfyUI, and FaceDetailer.
+#
+# Do NOT download FLUX.1-dev, CLIP-L, T5-XXL, or the FLUX VAE.
+# ============================================================================
+
+# Krea 2 Turbo FP8
 RUN curl -f --retry 3 --retry-delay 5 -L \
-      -o models/unet/flux1-dev-fp8.safetensors \
-      "https://huggingface.co/Comfy-Org/flux1-dev/resolve/main/flux1-dev-fp8.safetensors"
+      -o models/diffusion_models/krea2_turbo_fp8_scaled.safetensors \
+      "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_fp8_scaled.safetensors"
 
-# Text Encoders (CLIP-L & T5-XXL FP8)
+# Qwen3-VL 4B FP8 text encoder
 RUN curl -f --retry 3 --retry-delay 5 -L \
-      -o models/clip/clip_l.safetensors \
-      "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" && \
-    curl -f --retry 3 --retry-delay 5 -L \
-      -o models/clip/t5xxl_fp8_e4m3fn.safetensors \
-      "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors"
+      -o models/text_encoders/qwen3vl_4b_fp8_scaled.safetensors \
+      "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_fp8_scaled.safetensors"
 
-# VAE
+# Qwen Image VAE
 RUN curl -f --retry 3 --retry-delay 5 -L \
-      --header "Authorization: Bearer ${HUGGINGFACE_ACCESS_TOKEN}" \
-      -o models/vae/ae.safetensors \
-      "https://huggingface.co/black-forest-labs/FLUX.1-dev/resolve/main/ae.safetensors"
+      -o models/vae/qwen_image_vae.safetensors \
+      "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors"
 
-# -------------------------------------------------------------
-# Krea 2 LoRAs (Fully compatible with FP8 standard weights)
-# -------------------------------------------------------------
-# Realism / snapshot style
+
+# ============================================================================
+# KREA 2 LoRAs
+#
+# These are kept from the original project because they were specifically
+# selected for the Krea 2 workflow.
+# ============================================================================
+
+# Realistic Snapshot Krea 2
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/RealisticSnapshotKrea2.safetensors \
@@ -174,31 +193,82 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/RLY_Thot_Shot_Aspen_Krea2.safetensors \
       "https://civitai.com/api/download/models/3071791?fileId=2951279&token=${CIVITAI_TOKEN}"
-      
+
 # SNOFS
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/SNOFS_Krea2.safetensors \
       "https://civitai.com/api/download/models/3290120?fileId=3174557&token=${CIVITAI_TOKEN}"
 
-# Refusal / censorship reduction
+# Krea 2 TextFusion / refusal-reduction LoRA
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/Krea2_TextFusion_Refusal_Reduction.safetensors \
       "https://civitai.com/api/download/models/3125118?token=${CIVITAI_TOKEN}"
 
-# Upscale model for FaceDetailer / hires pass
+
+# ============================================================================
+# OPTIONAL OFFICIAL KREA 2 STYLE LoRAs
+#
+# Uncomment any of these if you want the official Krea 2 artistic styles.
+# ============================================================================
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_darkbrush.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_darkbrush.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_dotmatrix.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_dotmatrix.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_kidsdrawing.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_kidsdrawing.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_neondrip.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_neondrip.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_rainywindow.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_rainywindow.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_retroanime.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_retroanime.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_softwatercolor.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_softwatercolor.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_sunsetblur.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_sunsetblur.safetensors"
+
+# RUN curl -f --retry 3 --retry-delay 5 -L \
+#       -o models/loras/krea2_vintagetarot.safetensors \
+#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_vintagetarot.safetensors"
+
+
+# ============================================================================
+# FaceDetailer / Hi-Res Upscale
+# ============================================================================
+
+# 4x UltraSharp
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/upscale_models/4x-UltraSharp.pth \
       "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth"
 
-# Face detection model for FaceDetailer
+# YOLOv8 face detector for FaceDetailer
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/ultralytics/bbox/face_yolov8m.pt \
       "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
 
+
+# ============================================================================
 # Stage 3: Final image
+# ============================================================================
 FROM base AS final
 
-# Copy models from stage 2 to the final image
+# Copy Krea 2 models into final image
 COPY --from=downloader /comfyui/models /comfyui/models
