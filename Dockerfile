@@ -200,6 +200,12 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/SNOFS_Krea2.safetensors \
       "https://civitai.com/api/download/models/3290120?fileId=3174557&token=${CIVITAI_TOKEN}"
 
+# Ass & Thighs Slider
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/Ass_Thighs_Slider_Krea2.safetensors \
+      "https://civitai.red/api/download/models/3072964?fileId=2951934&token=${CIVITAI_TOKEN}"
+
 # Krea 2 TextFusion / refusal-reduction LoRA
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
