@@ -139,18 +139,12 @@ RUN mkdir -p \
     models/diffusion_models \
     models/upscale_models \
     models/ultralytics/bbox \
-    models/loras
+    models/loras \
+    models/SEEDVR2
 
 
 # ============================================================================
 # KREA 2 TURBO
-#
-# 48 GB GPU:
-# - Use the official ComfyUI FP8-scaled Turbo model.
-# - It is ~13.1 GB and leaves substantial VRAM for the Qwen encoder,
-#   VAE, LoRAs, ComfyUI, and FaceDetailer.
-#
-# Do NOT download FLUX.1-dev, CLIP-L, T5-XXL, or the FLUX VAE.
 # ============================================================================
 
 # Krea 2 Turbo FP8
@@ -171,16 +165,7 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
 
 # ============================================================================
 # KREA 2 LoRAs
-#
-# These are kept from the original project because they were specifically
-# selected for the Krea 2 workflow.
 # ============================================================================
-
-# Realistic Snapshot Krea 2
-RUN curl -f --retry 3 --retry-delay 5 -L \
-      --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/RealisticSnapshotKrea2.safetensors \
-      "https://civitai.com/api/download/models/3084537?fileId=2963911&token=${CIVITAI_TOKEN}"
 
 # BeMyHero - NylaX
 RUN curl -f --retry 3 --retry-delay 5 -L \
@@ -212,52 +197,27 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/Krea2_TextFusion_Refusal_Reduction.safetensors \
       "https://civitai.com/api/download/models/3125118?token=${CIVITAI_TOKEN}"
 
+# Anal Helper (Loraholic)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/anal_helper_krea2_loraholic.safetensors \
+      "https://civitai.com/api/download/models/3105253?fileId=2985077&token=${CIVITAI_TOKEN}"
 
-# ============================================================================
-# OPTIONAL OFFICIAL KREA 2 STYLE LoRAs
-#
-# Uncomment any of these if you want the official Krea 2 artistic styles.
-# ============================================================================
+# Photo/Detail Slider for SNOFS (Ashen3 v2)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/snofs_photoSlider14B.safetensors \
+      "https://civitai.com/api/download/models/3337902?token=${CIVITAI_TOKEN}"
 
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_darkbrush.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_darkbrush.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_dotmatrix.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_dotmatrix.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_kidsdrawing.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_kidsdrawing.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_neondrip.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_neondrip.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_rainywindow.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_rainywindow.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_retroanime.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_retroanime.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_softwatercolor.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_softwatercolor.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_sunsetblur.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_sunsetblur.safetensors"
-
-# RUN curl -f --retry 3 --retry-delay 5 -L \
-#       -o models/loras/krea2_vintagetarot.safetensors \
-#       "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/loras/krea2_vintagetarot.safetensors"
+# Candid Slider (Loraholic)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/candid_krea2_loraholic.safetensors \
+      "https://civitai.com/api/download/models/3123867?token=${CIVITAI_TOKEN}"
 
 
 # ============================================================================
-# FaceDetailer / Hi-Res Upscale
+# FaceDetailer / Detection Models
 # ============================================================================
 
 # 4x UltraSharp
@@ -265,10 +225,33 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/upscale_models/4x-UltraSharp.pth \
       "https://huggingface.co/lokCX/4x-Ultrasharp/resolve/main/4x-UltraSharp.pth"
 
-# YOLOv8 face detector for FaceDetailer
+# YOLOv8 face detector
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/ultralytics/bbox/face_yolov8m.pt \
       "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8m.pt"
+
+# Hand detector
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/ultralytics/bbox/hand_yolov8s.pt \
+      "https://huggingface.co/Bingsu/adetailer/resolve/main/hand_yolov8s.pt"
+
+# Person segmentation
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/ultralytics/bbox/person_yolov8m-seg.pt \
+      "https://huggingface.co/Bingsu/adetailer/resolve/main/person_yolov8m-seg.pt"
+
+
+# ============================================================================
+# SeedVR2 Upscaler
+# ============================================================================
+
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/SEEDVR2/seedvr2_7b_fp8_e4m3fn.safetensors \
+      "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_7b_fp8_e4m3fn.safetensors"
+
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      -o models/SEEDVR2/seedvr2_ema_vae_fp16.safetensors \
+      "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/ema_vae_fp16.safetensors"
 
 
 # ============================================================================
