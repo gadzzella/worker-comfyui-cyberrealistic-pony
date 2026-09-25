@@ -242,14 +242,14 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
 
 
 # ============================================================================
-# SeedVR2 Upscaler
+# SeedVR2 Upscaler (3B FP8 - reliable)
 # ============================================================================
 
-RUN curl -f --retry 3 --retry-delay 5 -L \
-      -o models/SEEDVR2/seedvr2_7b_fp8_e4m3fn.safetensors \
-      "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_7b_fp8_e4m3fn.safetensors"
+RUN curl -f --retry 5 --retry-delay 10 --retry-all-errors -L \
+      -o models/SEEDVR2/seedvr2_3b_fp8_e4m3fn.safetensors \
+      "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_3b_fp8_e4m3fn.safetensors"
 
-RUN curl -f --retry 3 --retry-delay 5 -L \
+RUN curl -f --retry 5 --retry-delay 10 --retry-all-errors -L \
       -o models/SEEDVR2/seedvr2_ema_vae_fp16.safetensors \
       "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/ema_vae_fp16.safetensors"
 
