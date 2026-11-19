@@ -215,6 +215,11 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/candid_krea2_loraholic.safetensors \
       "https://civitai.com/api/download/models/3123867?token=${CIVITAI_TOKEN}"
 
+# [BSS] - Mila
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/BSS_Mila.safetensors \
+      "https://civitai.com/api/download/models/3087625?fileId=2967472&token=${CIVITAI_TOKEN}"
 
 # ============================================================================
 # FaceDetailer / Detection Models
