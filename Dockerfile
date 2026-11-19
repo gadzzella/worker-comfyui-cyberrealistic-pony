@@ -195,7 +195,8 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/Krea2_TextFusion_Refusal_Reduction.safetensors \
-      "https://civitai.com/api/download/models/3125118?token=${CIVITAI_TOKEN}"
+      "https://huggingface.co/Quiho/Krea2_TextFusion_Refusal-Reduction_LoRA_v1.0_lora/resolve/main/Krea2_TextFusion_Refusal_Reduction.safetensors"
+
 
 # Anal Helper (Loraholic)
 RUN curl -f --retry 3 --retry-delay 5 -L \
