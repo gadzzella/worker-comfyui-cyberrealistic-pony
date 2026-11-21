@@ -9,6 +9,10 @@ ARG CUDA_VERSION_FOR_COMFY
 ARG ENABLE_PYTORCH_UPGRADE=false
 ARG PYTORCH_INDEX_URL
 
+# Set to "false" when building for 24 GB cards (L4/A10) so ComfyUI can offload
+# the text encoder instead of keeping everything resident in VRAM.
+ARG GPU_ONLY=true
+
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PIP_PREFER_BINARY=1
 ENV PYTHONUNBUFFERED=1
@@ -54,7 +58,8 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # Install comfy-cli
 RUN uv pip install comfy-cli pip setuptools wheel
 
-# Install ComfyUI
+# Install ComfyUI (Krea 2 needs a recent version; consider pinning a known-good
+# release via --build-arg COMFYUI_VERSION=x.y.z for reproducible builds)
 RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
       /usr/bin/yes | comfy --workspace /comfyui install \
         --version "${COMFYUI_VERSION}" \
@@ -96,20 +101,26 @@ ADD src/extra_model_paths.yaml ./
 WORKDIR /
 
 # RunPod/runtime dependencies
+# (Not needed if you only run on Modal, which launches main.py directly.
+#  Safe to remove this block, handler.py and start.sh in that case.)
 RUN uv pip install runpod requests websocket-client
 
 # Application code
 ADD src/start.sh src/network_volume.py handler.py test_input.json ./
 RUN chmod +x /start.sh
 
-# Guarantee --gpu-only
-RUN if grep -q -- '--gpu-only' /start.sh; then \
-      echo "start.sh: --gpu-only already present, leaving untouched"; \
+# Optionally guarantee --gpu-only (controlled by the GPU_ONLY build arg)
+RUN if [ "${GPU_ONLY}" = "true" ]; then \
+      if grep -q -- '--gpu-only' /start.sh; then \
+        echo "start.sh: --gpu-only already present, leaving untouched"; \
+      else \
+        sed -i 's/main\.py/main.py --gpu-only/' /start.sh; \
+        echo "start.sh: injected --gpu-only"; \
+      fi \
+      && grep -q -- '--gpu-only' /start.sh; \
     else \
-      sed -i 's/main\.py/main.py --gpu-only/' /start.sh; \
-      echo "start.sh: injected --gpu-only"; \
-    fi \
-    && grep -q -- '--gpu-only' /start.sh
+      echo "start.sh: GPU_ONLY=false, not injecting --gpu-only"; \
+    fi
 
 ENV PIP_NO_INPUT=1
 
@@ -127,20 +138,21 @@ FROM base AS downloader
 
 ARG CIVITAI_TOKEN
 
+# Hugging Face revision for Comfy-Org/Krea-2. "main" moves over time; for
+# reproducible builds pass a commit hash:
+#   --build-arg KREA_REV=<commit-sha>
+ARG KREA_REV=main
+
 WORKDIR /comfyui
 
-# Krea 2 directory structure
+# Directory structure (only what is actually used)
 RUN mkdir -p \
-    models/checkpoints \
     models/vae \
-    models/unet \
-    models/clip \
     models/text_encoders \
     models/diffusion_models \
     models/upscale_models \
     models/ultralytics/bbox \
-    models/loras \
-    models/SEEDVR2
+    models/loras
 
 
 # ============================================================================
@@ -150,17 +162,17 @@ RUN mkdir -p \
 # Krea 2 Turbo FP8
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/diffusion_models/krea2_turbo_fp8_scaled.safetensors \
-      "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/diffusion_models/krea2_turbo_fp8_scaled.safetensors"
+      "https://huggingface.co/Comfy-Org/Krea-2/resolve/${KREA_REV}/diffusion_models/krea2_turbo_fp8_scaled.safetensors"
 
 # Qwen3-VL 4B FP8 text encoder
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/text_encoders/qwen3vl_4b_fp8_scaled.safetensors \
-      "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/text_encoders/qwen3vl_4b_fp8_scaled.safetensors"
+      "https://huggingface.co/Comfy-Org/Krea-2/resolve/${KREA_REV}/text_encoders/qwen3vl_4b_fp8_scaled.safetensors"
 
 # Qwen Image VAE
 RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/vae/qwen_image_vae.safetensors \
-      "https://huggingface.co/Comfy-Org/Krea-2/resolve/main/vae/qwen_image_vae.safetensors"
+      "https://huggingface.co/Comfy-Org/Krea-2/resolve/${KREA_REV}/vae/qwen_image_vae.safetensors"
 
 
 # ============================================================================
@@ -173,11 +185,11 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/BeMyHero_NylaX_Krea2.safetensors \
       "https://civitai.com/api/download/models/3206740?fileId=3088255&token=${CIVITAI_TOKEN}"
 
-# RLY Thot Shot - Aspen
+# Asian Thick Ai influencer | Consistent Character | Instagram Influencer
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/RLY_Thot_Shot_Aspen_Krea2.safetensors \
-      "https://civitai.com/api/download/models/3071791?fileId=2951279&token=${CIVITAI_TOKEN}"
+      -o models/loras/asig2_Krea2.safetensors \
+      "https://civitai.com/api/download/models/3075077?fileId=2954123&token=${CIVITAI_TOKEN}"
 
 # SNOFS
 RUN curl -f --retry 3 --retry-delay 5 -L \
@@ -185,24 +197,17 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/SNOFS_Krea2.safetensors \
       "https://civitai.com/api/download/models/3290120?fileId=3174557&token=${CIVITAI_TOKEN}"
 
-# Ass & Thighs Slider
+# Bubble Butt
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/Ass_Thighs_Slider_Krea2.safetensors \
-      "https://civitai.red/api/download/models/3072964?fileId=2951934&token=${CIVITAI_TOKEN}"
+      -o models/loras/Bubble_Butt_Krea2.safetensors \
+      "https://civitai.com/api/download/models/3194194?fileId=3075137&token=${CIVITAI_TOKEN}"
 
 # Krea 2 TextFusion / refusal-reduction LoRA
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
       -o models/loras/Krea2_TextFusion_Refusal_Reduction.safetensors \
       "https://huggingface.co/Quiho/Krea2_TextFusion_Refusal-Reduction_LoRA_v1.0_lora/resolve/main/Krea2_TextFusion_Refusal_Reduction.safetensors"
-
-
-# Anal Helper (Loraholic)
-RUN curl -f --retry 3 --retry-delay 5 -L \
-      --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/anal_helper_krea2_loraholic.safetensors \
-      "https://civitai.com/api/download/models/3105253?fileId=2985077&token=${CIVITAI_TOKEN}"
 
 # Photo/Detail Slider for SNOFS (Ashen3 v2)
 RUN curl -f --retry 3 --retry-delay 5 -L \
@@ -216,11 +221,17 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/candid_krea2_loraholic.safetensors \
       "https://civitai.com/api/download/models/3123867?token=${CIVITAI_TOKEN}"
 
-# [BSS] - Mila
+# Haley
 RUN curl -f --retry 3 --retry-delay 5 -L \
       --header "User-Agent: Mozilla/5.0" \
-      -o models/loras/BSS_Mila.safetensors \
-      "https://civitai.com/api/download/models/3087625?fileId=2967472&token=${CIVITAI_TOKEN}"
+      -o models/loras/Haley.safetensors \
+      "https://civitai.com/api/download/models/3154756?fileId=3035549&token=${CIVITAI_TOKEN}"
+
+# Anal Helper (Loraholic)
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/anal_helper_krea2_loraholic.safetensors \
+      "https://civitai.com/api/download/models/3105253?fileId=2985077&token=${CIVITAI_TOKEN}"
 
 # ============================================================================
 # FaceDetailer / Detection Models
@@ -248,22 +259,9 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
 
 
 # ============================================================================
-# SeedVR2 Upscaler (3B FP8 - reliable)
-# ============================================================================
-
-RUN curl -f --retry 5 --retry-delay 10 --retry-all-errors -L \
-      -o models/SEEDVR2/seedvr2_3b_fp8_e4m3fn.safetensors \
-      "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/diffusion_models/seedvr2_3b_fp8_e4m3fn.safetensors"
-
-RUN curl -f --retry 5 --retry-delay 10 --retry-all-errors -L \
-      -o models/SEEDVR2/seedvr2_ema_vae_fp16.safetensors \
-      "https://huggingface.co/Comfy-Org/SeedVR2/resolve/main/vae/ema_vae_fp16.safetensors"
-
-
-# ============================================================================
 # Stage 3: Final image
 # ============================================================================
 FROM base AS final
 
-# Copy Krea 2 models into final image
+# Copy models into final image
 COPY --from=downloader /comfyui/models /comfyui/models
