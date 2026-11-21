@@ -233,6 +233,12 @@ RUN curl -f --retry 3 --retry-delay 5 -L \
       -o models/loras/anal_helper_krea2_loraholic.safetensors \
       "https://civitai.com/api/download/models/3105253?fileId=2985077&token=${CIVITAI_TOKEN}"
 
+# Bulldog Anal
+RUN curl -f --retry 3 --retry-delay 5 -L \
+      --header "User-Agent: Mozilla/5.0" \
+      -o models/loras/Bulldog_Anal_krea2.safetensors \
+      "https://civitai.com/api/download/models/3194110?fileId=3075031&token=${CIVITAI_TOKEN}"
+
 # ============================================================================
 # FaceDetailer / Detection Models
 # ============================================================================
